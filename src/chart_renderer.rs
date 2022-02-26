@@ -1,5 +1,5 @@
+use crate::chart::{RenderedChart, RenderedLine, RenderedSample};
 use crate::{chart::CandleType, y_axis::YAxis, Candle, Chart};
-use colored::*;
 
 pub struct ChartRenderer {
     pub bearish_color: (u8, u8, u8),
@@ -17,29 +17,14 @@ impl ChartRenderer {
     const UNICODE_UPPER_WICK: char = '╷';
     const UNICODE_LOWER_WICK: char = '╵';
 
-    pub const MARGIN_TOP: i64 = 3;
-
     pub fn new() -> ChartRenderer {
-        #[cfg(target_os = "windows")]
-        control::set_virtual_terminal(true).unwrap();
-
         ChartRenderer {
             bullish_color: (52, 208, 88),
             bearish_color: (234, 74, 90),
         }
     }
 
-    fn colorize(&self, candle_type: &CandleType, string: &str) -> String {
-        let (ar, ag, ab) = self.bearish_color;
-        let (br, bg, bb) = self.bullish_color;
-
-        match candle_type {
-            CandleType::Bearish => format!("{}", string.truecolor(ar, ag, ab)),
-            CandleType::Bullish => format!("{}", string.truecolor(br, bg, bb)),
-        }
-    }
-
-    fn render_candle(&self, candle: &Candle, y: i32, y_axis: &YAxis) -> String {
+    fn render_candle(&self, candle: &Candle, y: i32, y_axis: &YAxis) -> (CandleType, String) {
         let height_unit = y as f64;
         let high_y = y_axis.price_to_height(candle.high);
         let low_y = y_axis.price_to_height(candle.low);
@@ -80,45 +65,57 @@ impl ChartRenderer {
             }
         }
 
-        let candle_type = candle.get_type();
-
-        self.colorize(&candle_type, &output.to_string())
+        (candle.get_type(), output.to_string())
     }
 
-    pub fn render(&self, chart: &Chart) {
-        let mut output_str = "".to_owned();
+    pub fn render_to_buffer(&self, chart: &Chart) -> RenderedChart {
+        let mut rendered_chart = RenderedChart { lines: vec![] };
 
         let mut chart_data = chart.chart_data.borrow_mut();
-        chart_data.compute_height(&chart.volume_pane);
+        chart_data.compute_height(&chart.info_bar, &chart.volume_pane);
         drop(chart_data);
 
         let chart_data = chart.chart_data.borrow();
 
         for y in (1..chart_data.height as u16).rev() {
-            output_str += "\n";
+            let axis_component = chart.y_axis.render_line(y);
 
-            output_str += &chart.y_axis.render_line(y);
-
+            let mut samples = vec![];
             for candle in chart_data.visible_candle_set.candles.iter() {
-                output_str += &self.render_candle(candle, y.into(), &chart.y_axis);
+                let (candle_type, content) = self.render_candle(candle, y.into(), &chart.y_axis);
+                samples.push(RenderedSample {
+                    candle_type,
+                    content,
+                });
             }
+
+            rendered_chart.lines.push(RenderedLine {
+                axis_component,
+                samples,
+            });
         }
 
         if chart.volume_pane.enabled {
             for y in (1..chart.volume_pane.height + 1).rev() {
-                output_str += "\n";
+                let axis_component = chart.y_axis.render_empty();
 
-                output_str += &chart.y_axis.render_empty();
-
+                let mut samples = vec![];
                 for candle in chart_data.visible_candle_set.candles.iter() {
-                    output_str += &chart.volume_pane.render(candle, y);
+                    let (candle_type, content) = chart.volume_pane.render(candle, y);
+                    samples.push(RenderedSample {
+                        candle_type,
+                        content,
+                    });
                 }
+
+                rendered_chart.lines.push(RenderedLine {
+                    axis_component,
+                    samples,
+                });
             }
         }
 
-        output_str += &chart.info_bar.render();
-
-        println!("{}", output_str)
+        rendered_chart
     }
 }
 

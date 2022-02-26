@@ -16,7 +16,8 @@ pub struct Candle {
     pub timestamp: Option<i64>,
 }
 
-pub(crate) enum CandleType {
+#[derive(Debug, Copy, Clone)]
+pub enum CandleType {
     Bearish,
     Bullish,
 }
@@ -49,6 +50,20 @@ impl Candle {
     }
 }
 
+pub struct RenderedChart {
+    pub lines: Vec<RenderedLine>,
+}
+
+pub struct RenderedLine {
+    pub axis_component: String,
+    pub samples: Vec<RenderedSample>,
+}
+
+pub struct RenderedSample {
+    pub candle_type: CandleType,
+    pub content: String,
+}
+
 pub struct Chart {
     pub(crate) renderer: ChartRenderer,
     pub(crate) y_axis: YAxis,
@@ -59,17 +74,29 @@ pub struct Chart {
 
 impl Chart {
     pub fn new(candles: &[Candle]) -> Self {
+        Self::new_with_canvas_size(candles, None)
+    }
+
+    pub fn new_with_canvas_size(candles: &[Candle], canvas_size: Option<(u16, u16)>) -> Self {
         let renderer = ChartRenderer::new();
-        let chart_data = Rc::new(RefCell::new(ChartData::new(candles.to_vec())));
+        let chart_data = match canvas_size {
+            Some(canvas_size) => Rc::new(RefCell::new(ChartData::new_with_canvas_size(
+                candles.to_vec(),
+                canvas_size,
+            ))),
+            None => Rc::new(RefCell::new(ChartData::new(candles.to_vec()))),
+        };
         let y_axis = YAxis::new(chart_data.clone());
         let info_bar = InfoBar::new("APPLE".to_string(), chart_data.clone());
 
         let volume_pane = VolumePane::new(
             chart_data.clone(),
-            (chart_data.borrow().terminal_size.1 / 6) as i64,
+            (chart_data.borrow().canvas_size.1 / 6) as i64,
         );
 
-        chart_data.borrow_mut().compute_height(&volume_pane);
+        chart_data
+            .borrow_mut()
+            .compute_height(&info_bar, &volume_pane);
 
         Chart {
             renderer,
@@ -80,9 +107,9 @@ impl Chart {
         }
     }
 
-    /// Draws the chart by outputting multiples strings in the terminal.
-    pub fn draw(&self) {
-        self.renderer.render(self);
+    /// Draws the chart by outputting multiples strings to a string buffer.
+    pub fn draw_to_buffer(&self) -> RenderedChart {
+        self.renderer.render_to_buffer(self)
     }
 
     /// Set the name of the chart in the info bar.
@@ -128,5 +155,10 @@ impl Chart {
     /// Default is 1/6 of the terminal height.
     pub fn set_volume_pane_height(&mut self, height: i64) {
         self.volume_pane.height = height;
+    }
+
+    /// Hide or show the info bar.
+    pub fn set_info_bar_enabled(&mut self, enabled: bool) {
+        self.info_bar.enabled = enabled;
     }
 }

@@ -6,6 +6,8 @@ use crate::{chart_data::ChartData, y_axis::YAxis};
 
 pub struct InfoBar {
     pub name: String,
+    pub enabled: bool,
+    #[allow(dead_code)]
     chart_data: Rc<RefCell<ChartData>>,
 }
 
@@ -13,9 +15,14 @@ impl InfoBar {
     pub const HEIGHT: i64 = 2;
 
     pub fn new(name: String, chart_data: Rc<RefCell<ChartData>>) -> InfoBar {
-        InfoBar { name, chart_data }
+        InfoBar {
+            name,
+            enabled: true,
+            chart_data,
+        }
     }
 
+    #[allow(dead_code)]
     pub fn render(&self) -> String {
         let chart_data = self.chart_data.borrow();
         let main_set = chart_data.main_candle_set.clone();

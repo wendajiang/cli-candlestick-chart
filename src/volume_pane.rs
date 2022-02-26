@@ -1,5 +1,4 @@
 use crate::{chart::CandleType, chart_data::ChartData, Candle};
-use colored::Colorize;
 use std::{cell::RefCell, rc::Rc};
 
 pub struct VolumePane {
@@ -30,17 +29,7 @@ impl VolumePane {
         }
     }
 
-    fn colorize(&self, candle_type: &CandleType, string: &str) -> String {
-        let (ar, ag, ab) = self.bearish_color;
-        let (br, bg, bb) = self.bullish_color;
-
-        match candle_type {
-            CandleType::Bearish => format!("{}", string.truecolor(ar, ag, ab)),
-            CandleType::Bullish => format!("{}", string.truecolor(br, bg, bb)),
-        }
-    }
-
-    pub fn render(&self, candle: &Candle, y: i64) -> String {
+    pub fn render(&self, candle: &Candle, y: i64) -> (CandleType, String) {
         let max_volume = self.chart_data.borrow().visible_candle_set.max_volume;
         let volume = candle.volume.unwrap_or_default();
 
@@ -48,13 +37,13 @@ impl VolumePane {
         let ratio = volume_percent_of_max * self.height as f64;
 
         if y < ratio.ceil() as i64 {
-            return self.colorize(&candle.get_type(), &self.unicode_fill.to_string());
+            return (candle.get_type(), self.unicode_fill.to_string());
         }
 
         if y == 1 && self.unicode_fill == '┃' {
-            return self.colorize(&candle.get_type(), "╻");
+            return (candle.get_type(), "╻".to_string());
         }
 
-        " ".to_string()
+        (candle.get_type(), " ".to_string())
     }
 }
