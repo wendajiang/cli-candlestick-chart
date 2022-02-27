@@ -1,6 +1,5 @@
 use crate::{
-    candle_set::CandleSet, chart::Candle, info_bar::InfoBar,
-    volume_pane::VolumePane, y_axis::YAxis,
+    candle_set::CandleSet, chart::Candle, info_bar::InfoBar, volume_pane::VolumePane, y_axis::YAxis,
 };
 use terminal_size::terminal_size;
 
@@ -41,9 +40,13 @@ impl ChartData {
             0
         };
 
-        self.height = self.canvas_size.1 as i64
-            - info_bar_height
-            - volume_pane_height;
+        self.height = self.canvas_size.1 as i64 - info_bar_height - volume_pane_height;
+    }
+
+    #[allow(unused)]
+    pub fn compute_valuable_candles(canvas_size: (u16, u16)) -> i64 {
+        let term_width = canvas_size.0 as usize as i64;
+        term_width - YAxis::WIDTH
     }
 
     pub fn compute_visible_candles(&mut self) {
